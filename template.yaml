@@ -6,7 +6,7 @@ metadata:
   description: Creates a new repository with branch protection enabled on the main branch.
 
 spec:
-  owner: plataforma
+  owner: cdiegoo
   type: template
 
   parameters:
@@ -31,7 +31,7 @@ spec:
                   - User
         repoOrg:
           type: string
-          default: gupy-io
+          default: cdiegoo
           ui:widget: hidden
         repoUrl:
           title: Repository Location
