@@ -1,0 +1,108 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: create-repo-with-branch-protection
+  title: Create New Base Repository
+  description: Creates a new repository with branch protection enabled on the main branch.
+
+spec:
+  owner: plataforma
+  type: template
+
+  parameters:
+    - title: Repository Details
+      required:
+        - name
+        - repoUrl
+      properties:
+        name:
+          title: Component Name
+          type: string
+          description: Component Name
+          ui:autofocus: true
+          owner:
+            title: Owner
+            type: string
+            ui:field: EntityPicker
+            ui:options:
+              catalogFilter:
+                kind:
+                  - Group
+                  - User
+        repoOrg:
+          type: string
+          default: gupy-io
+          ui:widget: hidden
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+
+    - title: Branch Protection Settings
+      properties:
+        allowForcePushes:
+          title: Allow Force Pushes
+          type: boolean
+          default: false
+        requiredApprovingReviewCount:
+          title: Approving Reviews Required to Merge
+          type: number
+          default: 1
+
+  steps:
+    # Step to create a new repository
+    - id: publish
+      name: Publish Repository
+      action: publish:github
+      input:
+        allowedHosts: ['github.com']
+        description: Repository for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}
+        defaultBranch: main
+
+    # Step to apply branch protection to the main branch
+    - id: applyBranchProtection
+      name: Apply Branch Protection
+      action: http:backstage:request
+      input:
+        method: 'PUT'
+        path: /proxy/mygithub/api/repos/${{ parameters.repoOrg }}/${{ parameters.name }}/branches/main/protection
+        headers:
+          content-type: 'application/json'
+        body:
+          required_status_checks: null
+          enforce_admins: true
+          required_pull_request_reviews:
+            dismiss_stale_reviews: true
+            required_approving_review_count: ${{ parameters.requiredApprovingReviewCount }}
+            require_last_push_approval: true
+          restrictions: null
+          required_linear_history: false
+          allow_force_pushes: ${{ parameters.allowForcePushes }}
+          allow_deletions: false
+          block_creations: false
+          required_conversation_resolution: true
+          lock_branch: false
+          allow_fork_syncing: true
+
+    # Step to register the repository in the catalog
+    - id: register
+      name: Register in Catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps['publish'].output.remoteUrl }}
+      - title: Branch Protection Settings
+        icon: github
+        url: https://github.com/${{ parameters.repoOrg }}/${{ parameters.name }}/settings/branches
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
